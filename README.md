@@ -102,6 +102,29 @@ addresses, so the name does not resolve. Fallback: add to `/etc/hosts`
 - The proxy forwards to exactly one container (`TARGET`), not to arbitrary
   hosts. Only the target ports you list in `PORTS` are exposed.
 - The admin API of Caddy is disabled.
+- The container is hardened by `start.sh`: `--cap-drop=ALL --cap-add=NET_BIND_SERVICE`,
+  `--security-opt no-new-privileges`, `--read-only` root filesystem (writable:
+  the `/data` volume and tmpfs on `/etc/caddy`, `/config`, `/tmp`), `--memory
+  256m`, `--pids-limit 256`. No restart policy (it stays stopped after a
+  reboot or crash on purpose). It still runs as root inside the container.
+  `--dry-run` shows all flags.
+- Supply chain: the Cloudflare plugin is pinned to a commit (pseudo-version
+  `CF_PLUGIN_VERSION` in the `Dockerfile`) and both Caddy images are pinned by
+  tag and digest. To bump: for the plugin, take the newest commit of
+  `caddy-dns/cloudflare` master and build `v0.0.0-<UTC commit time
+  yyyymmddhhmmss>-<first 12 chars of sha>`; for the images, look up the digest
+  of the new tag (`docker buildx imagetools inspect caddy:<tag>` for the
+  runtime and `caddy:<tag>-builder` for the builder) and update
+  `CADDY_VERSION` and both `CADDY_*_DIGEST` args; then rebuild and test.
+- **Untested live:** `--read-only` and the pinned versions were not run against
+  a real certificate request when they were added (the image was not built
+  either). Before relying on it, start once against Let's Encrypt staging
+  (`ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory ./start.sh
+  <container>`), check `docker logs devbox-tls-<container>` for a successful
+  certificate and for write errors, then remove `ACME_CA` for the real one.
+- Follow-up ideas (tickets 039, 040, in the outer `tickets/` dir): scope the
+  Cloudflare token via ACME CNAME delegation, and optional auth in front of
+  the proxied target.
 
 ## Tests
 

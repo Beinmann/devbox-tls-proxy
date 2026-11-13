@@ -47,6 +47,12 @@ while read -r l _; do publish+=(-p "127.0.0.1:$l:$l"); done <<< "$pairs"
 
 run_args=(run -d --name "$NAME" --network "$NET" "${publish[@]}"
   -v "$VOLUME:/data"
+  # Hardening: no capabilities except binding low ports, read-only rootfs
+  # (writable: /data volume + tmpfs for the generated Caddyfile, Caddy's
+  # autosave under /config, and /tmp), resource limits. No restart policy.
+  --cap-drop=ALL --cap-add=NET_BIND_SERVICE --security-opt no-new-privileges
+  --read-only --tmpfs /etc/caddy --tmpfs /tmp --tmpfs /config
+  --memory 256m --pids-limit 256
   -e "TARGET=$TARGET" -e "PORTS=$PORTS" -e "DOMAIN=$DOMAIN" -e "HOST_HEADER=$HOST_HEADER")
 [[ -z $ACME_CA ]] || run_args+=(-e "ACME_CA=$ACME_CA")
 # The token goes through an env-file on stdin: never in argv or `docker inspect`
